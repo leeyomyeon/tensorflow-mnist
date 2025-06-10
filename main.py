@@ -2,10 +2,10 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.layers import (Dense, BatchNormalization, Dropout)
 from tensorflow.keras.datasets.mnist import load_data
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
 
 (train_images, train_labels), (test_images, test_labels) = load_data()
 model = None
@@ -20,10 +20,6 @@ def model_train():
   '''
   print("train_images.shape : ", train_images.shape)
   print("test_images.shape : ", test_images.shape)
-
-  # plt.hist(train_labels, bins=10, rwidth=0.8)
-  # plt.title("MNIST Label Distribution")
-  # plt.show()
 
   '''
   train_images 에서 일부분을 validation set으로 사용하기 위해서
@@ -85,7 +81,7 @@ def model_train():
     epochs=100,
     batch_size=5000,
     verbose=1,
-    callbacks=[early_stopping]
+    # callbacks=[early_stopping]
   )
   
   history_dict = pd.DataFrame(history.history)
@@ -107,5 +103,47 @@ def model_train():
   
   model.save('mnist_model.h5')
   
+oldx = oldy = -1
+def draw_number():
+  
+  def on_mouse(event, x, y, flags, param):
+    global oldx, oldy
+    if event == cv2.EVENT_LBUTTONDOWN:
+      oldx, oldy = x, y
+    elif event == cv2.EVENT_MOUSEMOVE:
+      if flags & cv2.EVENT_FLAG_LBUTTON:
+        cv2.line(img, (oldx, oldy), (x, y), (0, 0, 0), 8, cv2.LINE_8)
+        cv2.imshow('Draw Number', img)
+        oldx, oldy = x, y
+        
+    elif event == cv2.EVENT_LBUTTONUP:
+      pred_min_key = np.min(img ^ 255)
+      pred_max_key = np.max(img ^ 255)
+      pred_images = ((img ^ 255) - pred_min_key) / (pred_max_key - pred_min_key)
+      predict_img = cv2.resize(pred_images, dsize=(28, 28), interpolation=cv2.INTER_LINEAR)
+      predict_img = predict_img.reshape(1, 28, 28)
+      for i in range(28):
+        for j in range(28):
+          if predict_img[0][i][j] > 0:
+            print(1, end='')
+          else:
+            print(' ', end='')
+        print()
+      print(np.argmax(model.predict(predict_img), axis=-1))  # 예측 결과 출력
+      oldx = oldy = -1
+    elif event == cv2.EVENT_RBUTTONDOWN:
+      img[:] = 255 # Reset the image to white
+      cv2.imshow('Draw Number', img)
+      
+  img = np.ones((140, 140), dtype=np.uint8) * 255
+  cv2.namedWindow('Draw Number')
+  cv2.setMouseCallback('Draw Number', on_mouse, img)
+  
+  cv2.imshow('Draw Number', img)
+  cv2.waitKey() 
+  cv2.destroyAllWindows()
+  
 if model is None:
   model_train()
+else:
+  draw_number()
